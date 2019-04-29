@@ -1,4 +1,4 @@
-const ReComp = Union{Real,Complex}
+const ReComp = Number
 
 struct Dual{T<:ReComp} <: Number
     value::T
@@ -63,6 +63,26 @@ function dual_show(io::IO, z::Dual{T}, compact::Bool) where T<:Real
         compact ? show(IOContext(io, :compact=>true), y) : show(io, y)
         printtimes(io, y)
         print(io, "ɛ")
+    else
+        print(io, "Dual{",T,"}(", x, ",", y, ")")
+    end
+end
+
+function dual_show(io::IO, z::Dual{Dual{T}}, compact::Bool) where T<:Real
+    x, y = value(z), epsilon(z)
+    if isnan(x) || isfinite(y)
+        compact ? show(IOContext(io, :compact=>true), x) : show(io, x)
+		printtimes(io, x)
+        if signbit(y.value)==1 && !isnan(y)
+            y = -y
+            print(io, compact ? "-" : " - ")
+        else
+            print(io, compact ? "+" : " + ")
+        end
+        print(io, "(")
+        compact ? show(IOContext(io, :compact=>true), y) : show(io, y)
+        printtimes(io, y)
+        print(io, ")ϵ₂")
     else
         print(io, "Dual{",T,"}(", x, ",", y, ")")
     end
@@ -145,6 +165,13 @@ function printtimes(io::IO, x::Real)
     end
 end
 
+function printtimes(io::IO, x::Dual)
+    if !(isa(x,Integer) || isa(x,Rational) ||
+         isa(x,Dual) && isfinite(x))
+        print(io, "*")
+    end
+end
+
 Base.show(io::IO, z::Dual) = dual_show(io, z, get(IOContext(io), :compact, false))
 
 function Base.read(s::IO, ::Type{Dual{T}}) where T<:ReComp
@@ -174,6 +201,10 @@ Base.isequal(x::Number, z::Dual) = isequal(z, x)
 Base.isless(z::Dual{<:Real},w::Dual{<:Real}) = value(z) < value(w)
 Base.isless(z::Real,w::Dual{<:Real}) = z < value(w)
 Base.isless(z::Dual{<:Real},w::Real) = value(z) < w
+
+Base.isless(z::Dual{<:Dual},w::Dual{<:Dual}) = value(z) < value(w)
+Base.isless(z::Real,w::Dual{<:Dual}) = z < value(w)
+Base.isless(z::Dual{<:Dual},w::Real) = value(z) < w
 
 Base.hash(z::Dual) = (x = hash(value(z)); epsilon(z)==0 ? x : bitmix(x,hash(epsilon(z))))
 
